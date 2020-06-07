@@ -1,0 +1,13 @@
+{
+    "files.associations": {
+        "vector": "cpp",
+        "string": "cpp",
+        "iosfwd": "cpp",
+        "iterator": "cpp",
+        "__locale": "cpp",
+        "locale": "cpp",
+        "iostream": "cpp",
+        "map": "cpp",
+        "ostream": "cpp"
+    }
+}

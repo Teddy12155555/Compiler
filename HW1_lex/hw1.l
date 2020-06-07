@@ -1,4 +1,5 @@
 %{
+	/* from template */
 	#define LIST     strcat(buf,yytext)
 	#define token(t) {LIST; printf("<'%s'>\n",t);}
 	#define tokenInteger(t,i) {LIST; printf("<%s: %d>\n",t,i);}
@@ -14,6 +15,8 @@
 	#include <string.h>
 	#include <stdlib.h>
 
+	/* table datatype
+	 use linked list */
 	typedef struct
 	{
     	char *Key;
@@ -28,6 +31,7 @@
     	int size;
 	} SymbolTable;
 
+	/* table's method */
 	SymbolTable *create();
 	int lookup(char *Key, SymbolTable *Table);
 	void insert(char *Key, SymbolTable *Table);
@@ -40,6 +44,8 @@
 %pointer
 
 %x COMMENT
+
+/* regex declare */
 
 delims [,:;()\[\]\{\}\.]
 
@@ -62,7 +68,7 @@ blockcommentend "*/"
 
 %%
 
- // Keywords
+ /* Keywords */
 
 boolean {
 	token("BOOLEAN");
@@ -155,8 +161,10 @@ while {
 }
 
 {string} {
+	/* deal with special condition */
 	char c = input();
 	if(c =='"'){
+		/* add tag */
 		unput(c);
 		yymore();
 	}
@@ -243,6 +251,7 @@ while {
 
 %%
 
+/* create a table */
 SymbolTable *create()
 {
     SymbolTable *temp = malloc(sizeof(SymbolTable));
@@ -250,6 +259,8 @@ SymbolTable *create()
     temp->size = 0;
     return temp;
 }
+
+/* chheck if key is in Table */
 int lookup(char *Key, SymbolTable *Table)
 {
     if (Table->size == 0 || Table->items == NULL)
@@ -264,8 +275,10 @@ int lookup(char *Key, SymbolTable *Table)
     }
     return -1;
 }
+/* insert key to table, value is times of key */
 void insert(char *Key, SymbolTable *Table)
 {
+	// if key exist
     int flag = lookup(Key, Table);
     if (flag >= 0)
     {
@@ -278,6 +291,7 @@ void insert(char *Key, SymbolTable *Table)
     }
     else
     {
+		// key not exist, create new one
 		Item *newItem = malloc(sizeof(Item));
 		newItem->Key = malloc(strlen(Key)+1);
 		strcpy(newItem->Key, Key);
@@ -303,6 +317,7 @@ void insert(char *Key, SymbolTable *Table)
 		}
     }
 }
+/* show all keys in table */
 void dump(SymbolTable *Table)
 {
     //printf("Table size : %d\n", Table->size);
