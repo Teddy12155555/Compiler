@@ -39,124 +39,124 @@
    /* Put the tokens into the symbol table, so that GDB and other debuggers
       know about them.  */
    enum yytokentype {
-     SEMICOLON = 258,
-     BOOLEAN = 259,
-     BREAK = 260,
-     CHAR = 261,
-     CASE = 262,
-     CLASS = 263,
-     CONTINUE = 264,
-     DEF = 265,
-     DO = 266,
-     ELSE = 267,
-     EXIT = 268,
-     FALSE = 269,
-     FLOAT = 270,
-     FOR = 271,
-     IF = 272,
-     INT = 273,
-     _NULL = 274,
-     OBJECT = 275,
-     PRINT = 276,
-     PRINTLN = 277,
-     READ = 278,
-     REPEAT = 279,
-     RETURN = 280,
-     STRING = 281,
-     TO = 282,
-     TRUE = 283,
-     TYPE = 284,
-     VAL = 285,
-     VAR = 286,
-     WHILE = 287,
-     ASSIGN = 288,
+     BOOLEAN = 258,
+     BREAK = 259,
+     CHAR = 260,
+     CASE = 261,
+     CLASS = 262,
+     CONTINUE = 263,
+     DEF = 264,
+     DO = 265,
+     ELSE = 266,
+     EXIT = 267,
+     FALSE = 268,
+     FLOAT = 269,
+     FOR = 270,
+     IF = 271,
+     INT = 272,
+     OBJECT = 273,
+     PRINT = 274,
+     PRINTLN = 275,
+     REPEAT = 276,
+     RETURN = 277,
+     STRING = 278,
+     TO = 279,
+     TRUE = 280,
+     TYPE = 281,
+     VAL = 282,
+     VAR = 283,
+     WHILE = 284,
+     ASSIGN = 285,
+     READ = 286,
+     _NULL_ = 287,
+     ID = 288,
      BOOL_VALUE = 289,
      INT_VALUE = 290,
      STRING_VALUE = 291,
      FLOAT_VALUE = 292,
-     ID = 293,
-     CHAR_VALUE = 294,
-     OR_OP = 295,
-     AND_OP = 296,
-     NOT = 297,
-     NE = 298,
-     GE = 299,
-     GT = 300,
-     EQ = 301,
-     LE = 302,
-     LT = 303,
-     UMINUS = 304
+     CHAR_VALUE = 293,
+     UMINUS = 294,
+     LG_NOT = 295,
+     LG_OR = 296,
+     LG_AND = 297,
+     NOTEQUAL = 298,
+     EQUAL = 299,
+     MORETHEN = 300,
+     MOREEQUAL = 301,
+     LESSEQUAL = 302,
+     LESSTHEN = 303
    };
 #endif
 /* Tokens.  */
-#define SEMICOLON 258
-#define BOOLEAN 259
-#define BREAK 260
-#define CHAR 261
-#define CASE 262
-#define CLASS 263
-#define CONTINUE 264
-#define DEF 265
-#define DO 266
-#define ELSE 267
-#define EXIT 268
-#define FALSE 269
-#define FLOAT 270
-#define FOR 271
-#define IF 272
-#define INT 273
-#define _NULL 274
-#define OBJECT 275
-#define PRINT 276
-#define PRINTLN 277
-#define READ 278
-#define REPEAT 279
-#define RETURN 280
-#define STRING 281
-#define TO 282
-#define TRUE 283
-#define TYPE 284
-#define VAL 285
-#define VAR 286
-#define WHILE 287
-#define ASSIGN 288
+#define BOOLEAN 258
+#define BREAK 259
+#define CHAR 260
+#define CASE 261
+#define CLASS 262
+#define CONTINUE 263
+#define DEF 264
+#define DO 265
+#define ELSE 266
+#define EXIT 267
+#define FALSE 268
+#define FLOAT 269
+#define FOR 270
+#define IF 271
+#define INT 272
+#define OBJECT 273
+#define PRINT 274
+#define PRINTLN 275
+#define REPEAT 276
+#define RETURN 277
+#define STRING 278
+#define TO 279
+#define TRUE 280
+#define TYPE 281
+#define VAL 282
+#define VAR 283
+#define WHILE 284
+#define ASSIGN 285
+#define READ 286
+#define _NULL_ 287
+#define ID 288
 #define BOOL_VALUE 289
 #define INT_VALUE 290
 #define STRING_VALUE 291
 #define FLOAT_VALUE 292
-#define ID 293
-#define CHAR_VALUE 294
-#define OR_OP 295
-#define AND_OP 296
-#define NOT 297
-#define NE 298
-#define GE 299
-#define GT 300
-#define EQ 301
-#define LE 302
-#define LT 303
-#define UMINUS 304
+#define CHAR_VALUE 293
+#define UMINUS 294
+#define LG_NOT 295
+#define LG_OR 296
+#define LG_AND 297
+#define NOTEQUAL 298
+#define EQUAL 299
+#define MORETHEN 300
+#define MOREEQUAL 301
+#define LESSEQUAL 302
+#define LESSTHEN 303
 
 
 
 
 #if ! defined YYSTYPE && ! defined YYSTYPE_IS_DECLARED
 typedef union YYSTYPE
-#line 23 "yacc.y"
+#line 50 "parser.y"
 {
-    float floatval;
-    int intval;
-    bool boolval;
-    string* stringval;
-    int valueType;
-    valueInfo* value;
-    char charval;
-    // here is record for the function on called
-    vector<valueInfo*>* valueInfoVec;
-    vector<pair<string,int>*>* argumentsInfo;
-    map<string, idInfo*>* idMap;
-    pair<string,int>* argumentInfo;
+    float fVAL;
+    int iVAL;
+    bool bVAL;
+    string * sVAL;
+    char cVAL;
+    DataValue * dataValue;
 
+    // Enum
+    ID_DATA_TYPE DATA_TYPE;
+    // Block
+    map<string, IDContent *>* blockTABLE;
+    // Function Call
+    vector<DataValue*>* func_CallArgs;
+    vector<IDContent*>* func_DeclareArgs;
+    IDContent* func_DeclareArg;
 }
 /* Line 1529 of yacc.c.  */
 #line 163 "y.tab.hpp"

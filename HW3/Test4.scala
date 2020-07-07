@@ -1,8 +1,3 @@
-/* fib.scala
- *
- * This test program computes the Nth Fibonacci number
- */
-
 object fib
 {
   // variables

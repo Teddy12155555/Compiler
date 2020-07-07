@@ -1277,7 +1277,7 @@ YY_RULE_SETUP
 #line 301 "scanner.l"
 {
 	LIST;
-	printf("%d: %s", linenum++, buf);
+	//printf("%d: %s", linenum++, buf);
 	buf[0] = '\0';	
 }
 	YY_BREAK
@@ -1287,7 +1287,7 @@ YY_RULE_SETUP
 #line 307 "scanner.l"
 {
 	LIST;
-	printf("%d: %s", linenum++, buf);
+	//printf("%d: %s", linenum++, buf);
     //charnum = 0;
 	buf[0] = '\0';
 }
@@ -1304,8 +1304,8 @@ YY_RULE_SETUP
 #line 318 "scanner.l"
 {
 	LIST;
-	printf("%d:%s\n", linenum, buf);
-	printf("bad character:’%s’\n",yytext);
+	//printf("%d:%s\n", linenum, buf);
+	//printf("bad character:’%s’\n",yytext);
 	exit(-1);
 }
 	YY_BREAK

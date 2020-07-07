@@ -9,8 +9,12 @@
 #include <math.h>
 #include <utility>
 #include <string>
+#include <fstream>
 
 using namespace std;
+
+extern fstream JavaCode;
+extern int JumpCount;
 
 // Enum
 enum ID_DECLARE_TYPE
@@ -76,7 +80,30 @@ string getIdDataTypeStr(ID_DATA_TYPE idtype)
         break;
     }
 }
-
+string getIdDataTypeCode(ID_DATA_TYPE idtype)
+{
+    switch (idtype)
+    {
+    case (INT_TYPE):
+        return "int";
+        break;
+    case (BOOL_TYPE):
+        return "int"; // boolean
+        break;
+    case (CHAR_TYPE):
+        return "char";
+        break;
+    case (STR_TYPE):
+        return "java.lang.String";
+        break;
+    case (FLOAT_TYPE):
+        return "float";
+        break;
+    case (NIL_TYPE):
+        return "unknown";
+        break;
+    }
+}
 // Basic value class
 // this class is the content of each id content
 class DataValue
@@ -90,10 +117,10 @@ private:
         string *strVal;
     };
     ID_DATA_TYPE DataType;
-    bool isHasValue;
 
 public:
     // Constructor
+    bool isHasValue;
     DataValue() { isHasValue = false; }
     DataValue(ID_DATA_TYPE Type)
     {
@@ -223,6 +250,7 @@ public:
     IDContent() {}
     IDContent(string name, ID_DECLARE_TYPE type)
     {
+        stackID = -1;
         IdName = name;
         DeclareType = type;
         DataType = NIL_TYPE;
@@ -230,6 +258,7 @@ public:
     }
     IDContent(string name, ID_DECLARE_TYPE type, DataValue *data)
     {
+        stackID = -1;
         IdName = name;
         DeclareType = type;
         Data = data;
@@ -238,6 +267,7 @@ public:
     }
     IDContent(string name, ID_DECLARE_TYPE type, ID_DATA_TYPE datatype)
     {
+        stackID = -1;
         IdName = name;
         DeclareType = type;
         DataType = datatype;
@@ -248,6 +278,7 @@ public:
     {
         // Array
         // : " << type << endl;
+        stackID = -1;
         IdName = name;
         DeclareType = type;
         DataType = datatype;
@@ -261,6 +292,7 @@ public:
     }
     IDContent(ID_DATA_TYPE datatype)
     {
+        stackID = -1;
         DataType = datatype;
         Data = new DataValue(datatype);
     }
@@ -291,6 +323,8 @@ public:
     void setData(DataValue *data)
     {
         Data = data;
+        Data->setType(data->getDataType());
+        DataType = data->getDataType();
     }
     // Array methods
     int getArrayLen()
@@ -333,6 +367,7 @@ public:
     {
         return FuncTable;
     }
+    int stackID = -1;
 };
 
 // Atom of GlobalTABLE
@@ -435,4 +470,107 @@ public:
     {
         return glTABLES[top].getSymbolTable();
     }
+    int getTop()
+    {
+        return top;
+    }
 };
+
+// JavaCode gen
+void GlobalVarCode(string id)
+{
+    JavaCode << "\tfield static int " << id << endl;
+}
+void GlobalVarCode(string id, int integer)
+{
+    JavaCode << "\tfield static int " << id << " = " << integer << endl;
+}
+void PushCode(int integer)
+{
+    JavaCode << "\t\tldc " << integer << endl;
+}
+void StoreCode(int index)
+{
+    JavaCode << "\t\tistore " << index << endl;
+}
+void PrintCode()
+{
+    JavaCode << "\t\tgetstatic java.io.PrintStream java.lang.System.out" << endl;
+}
+void LoadCode(int index)
+{
+    JavaCode << "\t\tiload " << index << endl;
+}
+void OpCode(char op)
+{
+    switch (op)
+    {
+    case 'n':
+        JavaCode << "\t\tineg" << endl;
+        break;
+    case '+':
+        JavaCode << "\t\tiadd" << endl;
+        break;
+    case '-':
+        JavaCode << "\t\tisub" << endl;
+        break;
+    case '*':
+        JavaCode << "\t\timul" << endl;
+        break;
+    case '/':
+        JavaCode << "\t\tidiv" << endl;
+        break;
+    case '!':
+        JavaCode << "\t\tldc 1" << endl
+                 << "\t\tixor" << endl;
+        break;
+    case '&':
+        JavaCode << "\t\tiand" << endl;
+        break;
+    case '|':
+        JavaCode << "\t\tior" << endl;
+        break;
+    }
+}
+
+void LogicOpCode(int op)
+{
+
+    JavaCode << "\t\tisub" << endl;
+    switch (op)
+    {
+    case 0:
+        JavaCode << "\t\tiflt"; // <
+        break;
+    case 1:
+        JavaCode << "\t\tifle"; // <=
+        break;
+    case 2:
+        JavaCode << "\t\tifeq"; //==
+        break;
+    case 3:
+        JavaCode << "\t\tifgt"; //>
+        break;
+    case 4:
+        JavaCode << "\t\tifge"; //>=
+        break;
+    case 5:
+        JavaCode << "\t\tifne"; //!=
+        break;
+    }
+
+    int jump1 = JumpCount++;
+    int jump2 = JumpCount++;
+
+    JavaCode << " L" << jump1 << endl;
+    JavaCode << "\t\ticonst_0" << endl;
+    JavaCode << "\t\tgoto L" << jump2 << endl;
+    JavaCode << "\tL"
+             << jump1
+             << ":" << endl;
+    JavaCode << "\t\ticonst_1" << endl;
+    JavaCode << "\t\tgoto L" << jump2 << endl;
+    JavaCode << "\tL"
+             << jump2
+             << ":" << endl;
+}

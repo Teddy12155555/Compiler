@@ -2,28 +2,47 @@
 #include <iostream>
 #include "Tables.hpp"
 #include "lex.yy.cpp"
-#define Trace(s)        {cout << "Parser Msg : " << s << endl;}
+#define Trace(s)        //{cout << "Parser Msg : " << s << endl;}
 #define Warning(t)      {printf(t);printf("\n");} 
 
+bool isHasMain = false;
 // yyeror define
 void yyerror(string error_msg){
     cout << "=============== Error ===============" << endl;
     cout << buf << " ( " <<  error_msg <<  " )" << endl;
     cout << "============ Parser Fail ============" << endl;
     cout << "Terminal Casuse By Error" << endl << endl;
-    //exit(-1);
-}void yyerror(string error_msg,string t)
+    exit(-1);
+}
+void yyerror(string error_msg,string t)
 {
     cout << "=============== Error ===============" << endl;
     cout << buf << " ( " <<  error_msg <<  ")" << endl;
     cout << "With bad string : " << t << endl;
     cout << "============ Parser Fail ============" << endl;
     cout << "Terminal Casuse By Error" << endl << endl;
-    //exit(-1);
+    exit(-1);
 }
 // Create a new global tables
 GlobalTABLE SYMBOLTABLES;
 bool global_INSERT(IDContent * Id);
+
+// Java 
+streampos fp;
+int varStackID = 0;
+int tabCounts = 1;
+// extern vars
+fstream JavaCode;
+int JumpCount;
+//
+
+string className = "";
+// some bool flags
+bool returnFlag = false;
+bool IsElseIf = false;
+//
+vector<vector<int>> IfJumpPoints;
+vector<vector<int>> WhileJumpPoints;
 
 %}
 
@@ -71,6 +90,8 @@ bool global_INSERT(IDContent * Id);
 %type <func_DeclareArgs> ARGS
 %type <func_DeclareArg> ARG
 // //////////////////////////////
+//Jave
+%type <bVAL> BLOCK_OR_SIMPLE WHILE_BLOCK_OR_SIMPLE
 
 %nonassoc UMINUS
 %left LG_AND LG_OR LG_NOT
@@ -98,11 +119,14 @@ PROGRAM :
             {
                 yyerror("This ID Already Exist(from OBJ ID)",*$2);
             }
-            
+
+            className = *$2;
+            JavaCode << "class " << *$2 << "{" << endl;
         }
         '{' OBJECT_CONTENTS '}'
         {
             //Trace("");
+            JavaCode << "}" << endl;
         }
 
 // { OBJ content }
@@ -119,11 +143,15 @@ VARIABLES   :   VAR_VARIABLE
             |   VAL_VARIABLE
             ;
 
-VAL_VARIABLE    :   VAL ID ASSIGN EXPRESSION
+VAL_VARIABLE    :   VAL ID 
+                {
+                    fp = JavaCode.tellg();
+                }
+                ASSIGN EXPRESSION
                 {
                     Trace("VAL ID = EXPRESSION");
                     // Create new const var to gloabl Tables
-                    if(SYMBOLTABLES.insertTABLE(new IDContent(*$2,CONST_TYPE,$4)))
+                    if(SYMBOLTABLES.insertTABLE(new IDContent(*$2,CONST_TYPE,$5)))
                     {
 
                     }
@@ -131,16 +159,21 @@ VAL_VARIABLE    :   VAL ID ASSIGN EXPRESSION
                     {
                         yyerror("ID error",*$2);
                     }
+                    JavaCode.seekg(fp);
                 }
-                |   VAL ID ':' TYPE_ ASSIGN EXPRESSION
+                |   VAL ID ':' TYPE_ 
+                {
+                    fp = JavaCode.tellg();
+                }
+                ASSIGN EXPRESSION
                 {
                     Trace("VAL ID : TYPE = EXPRESSION");
-                    if($4 != $6->getDataType())
+                    if($4 != $7->getDataType())
                     {
                         yyerror("Type Error, Not match(assign diff type)");
                     }
                     // Create new const var to gloabl Tables
-                    if(SYMBOLTABLES.insertTABLE(new IDContent(*$2,CONST_TYPE,$6)))
+                    if(SYMBOLTABLES.insertTABLE(new IDContent(*$2,CONST_TYPE,$7)))
                     {
                         // Successed
                     }
@@ -148,7 +181,7 @@ VAL_VARIABLE    :   VAL ID ASSIGN EXPRESSION
                     {
                         yyerror("ID error",*$2);
                     }
-                    
+                    JavaCode.seekg(fp);
                 }
 
 VAR_VARIABLE    :   VAR ID ASSIGN EXPRESSION
@@ -161,6 +194,19 @@ VAR_VARIABLE    :   VAR ID ASSIGN EXPRESSION
                     else
                     {
                         yyerror("ID Error(VAR ID = EXPRESSION)");
+                    }
+
+                    IDContent * Id = SYMBOLTABLES.lookupTABLE(*$2);
+                    if (SYMBOLTABLES.getTop() == 0)
+                    {
+                        GlobalVarCode(*$2);
+                        JavaCode << "\t\tputstatic int " << className << "." << *$2 << endl;
+                    }
+                    else
+                    {
+                        Id->stackID = varStackID;
+                        StoreCode(varStackID++);
+                        
                     }
                 }
                 |   VAR ID ':' TYPE_ ASSIGN EXPRESSION
@@ -179,6 +225,19 @@ VAR_VARIABLE    :   VAR ID ASSIGN EXPRESSION
                     {
                         yyerror("ID Error(VAR ID : TYPE = EXPRESSION)",*$2);
                     }
+
+                    IDContent * Id = SYMBOLTABLES.lookupTABLE(*$2);
+                    if (SYMBOLTABLES.getTop() == 0)
+                    {
+                        GlobalVarCode(*$2);
+                        JavaCode << "\t\tputstatic int " << className << "." << *$2 << endl;
+                    }
+                    else
+                    {
+                        Id->stackID = varStackID;
+                        StoreCode(varStackID++);
+                    }
+
                 }
                 |   VAR ID ':' TYPE_
                 {
@@ -192,6 +251,20 @@ VAR_VARIABLE    :   VAR ID ASSIGN EXPRESSION
                     {
                         yyerror("ID Error(VAR ID : TYPE )",*$2);
                     }
+
+                    IDContent * Id = SYMBOLTABLES.lookupTABLE(*$2);
+                    if (SYMBOLTABLES.getTop() == 0)
+                    {
+                        GlobalVarCode(*$2);
+                        //JavaCode << "\t\tputstatic int " << className << "." << *$2 << endl;
+                    }
+                    else
+                    {
+                        PushCode(0);
+                        Id->stackID = varStackID;
+                        StoreCode(varStackID++);
+                    }
+
                 }
                 |   VAR ID ':' TYPE_ '[' INT_VALUE ']'
                 {
@@ -216,6 +289,20 @@ VAR_VARIABLE    :   VAR ID ASSIGN EXPRESSION
                     {
                         yyerror("ID Error(VAR ID : TYPE )",*$2);
                     }
+
+                    IDContent * Id = SYMBOLTABLES.lookupTABLE(*$2);
+                    if (SYMBOLTABLES.getTop() == 0)
+                    {
+                        GlobalVarCode(*$2);
+                        //JavaCode << "\t\tputstatic int " << className << "." << *$2 << endl;
+                    }
+                    else
+                    {
+                        PushCode(0);
+                        Id->stackID = varStackID;
+                        StoreCode(varStackID++);
+                    }
+
                 }
 
 //
@@ -230,7 +317,7 @@ VAR_VARIABLE    :   VAR ID ASSIGN EXPRESSION
 // ========================== 
 //
 FUNCTIONS   :   DEF ID
-            {
+            {        
                 Trace("DEF ID");
                 if(SYMBOLTABLES.insertTABLE(new IDContent(*$2,FUNC_TYPE)))
                 {
@@ -240,7 +327,8 @@ FUNCTIONS   :   DEF ID
                 {
                     yyerror("Function ID Error, already exist",*$2);
                 }
-
+                returnFlag = false;
+                varStackID = 0;
             }
             '(' ARGS
             {
@@ -253,10 +341,63 @@ FUNCTIONS   :   DEF ID
                 IDContent * Id = SYMBOLTABLES.lookupTABLE(*$2);
                 Id->setReturnType($8);
 
+                if (*$2 == "main")
+                {
+                    cout << "has a main ! \n";
+                    isHasMain = true;
+
+                    JavaCode << "\tmethod public static void main(java.lang.String[])" << endl;
+                    JavaCode << "\tmax_stack 15" << endl << "\tmax_locals 15" << endl;
+                    JavaCode << "\t{" << endl;
+                    
+                }
+                else
+                {
+                    // Func no return
+                    if(Id->getReturnType() == NIL_TYPE)
+                    {
+                        JavaCode << "\tmethod public static void " << *$2;
+                    }
+                    else
+                    {
+                        // func return something
+                        JavaCode << "\tmethod public static " << getIdDataTypeCode($8) << " " << *$2;
+                    }
+                    if($5->size() == 0){
+                        JavaCode << "()" << endl;
+                    }
+                    else
+                    {
+                        JavaCode << "(";
+                        int count = $5->size()-1;
+                        for(int i = count;i >= 0 ;i--)
+                        {
+                            if(i == count){
+                                JavaCode << getIdDataTypeCode((*$5)[i]->getDataType());
+                            }
+                            else{
+                                JavaCode << "," <<  getIdDataTypeCode((*$5)[i]->getDataType());
+                            }
+                        }
+                        JavaCode << ")" << endl;
+                    }
+                    JavaCode << "\tmax_stack 15" << endl << "\tmax_locals 15" << endl; 
+                    JavaCode << "\t{" << endl;
+                }
+
             }
             FUNCTION_SCOPE
             {
+                
                 SYMBOLTABLES.popTABLE();
+
+                if($8 == NIL_TYPE && !returnFlag)
+                {
+                    JavaCode << "\t\treturn" << endl;
+                }
+                JavaCode << "\t\treturn" << endl;
+                JavaCode << "\t}" << endl;
+
             };
 
 
@@ -290,6 +431,8 @@ ARG : ID ':' TYPE_
             yyerror("Function ARG ID Error, already exist",*$1);
         }
         $$ = new IDContent(*$1,VAR_TYPE,$3);
+        IDContent * temp = SYMBOLTABLES.lookupTABLE(*$1);
+        temp->stackID = varStackID++;
     }
 // Functions Type
 FUNCTION_RETURN_TYPE    :   ':' TYPE_
@@ -307,6 +450,7 @@ FUNCTION_SCOPE  :   '{'
                 {
                     Trace("FUNCTION SCOPE {");
                     SYMBOLTABLES.pushTABLE();
+                    cout << "~~~~~~~~~~~~~HERE!!!!!!!!!!!!!!\n";
                 } 
                 STATEMENTS FUNCTION_RETURN '}'
                 {
@@ -314,7 +458,7 @@ FUNCTION_SCOPE  :   '{'
                     $$ = new map<string,IDContent*>();
                     // save a func id table because function call need
                     *$$ = SYMBOLTABLES.getTopTable();
-                    SYMBOLTABLES.dumpTABLE();
+                    //SYMBOLTABLES.dumpTABLE();
                     SYMBOLTABLES.popTABLE();
                 }
 FUNCTION_RETURN     :   RETURN  EXPRESSION
@@ -360,17 +504,40 @@ SIMPLE_STATEMENT    :   VARIABLES
                     {
                         Trace("ID = EXPRESSION");
                         IDContent * temp = SYMBOLTABLES.lookupTABLE(*$1);
-                        cout << *$1 << endl;
                         if(temp == NULL)
                             yyerror("ID Error, Not exist in the scope",*$1);
                         if(temp->getDeclareType() != VAR_TYPE)
                             yyerror("Type Error, Not allow to assign");
-
-                        if(temp->getDataType() != $3->getDataType())
+                        
+                        if(temp->getData()->isHasValue)
                         {
-                            yyerror("Assign diff Type(etc... assign bool to int)",getIdDataTypeStr($3->getDataType()));
+                            cout << "Fuck at : " << getIdDataTypeStr(temp->getDataType()) << endl;
+                            if(temp->getDataType() != $3->getDataType())
+                            {
+                                cout << "Bad assignment : " << *$1 << endl;
+                                yyerror("Assign diff Type(etc... assign bool to int)",getIdDataTypeStr($3->getDataType()));
+                            }
+                            else
+                            {
+                                temp->setData($3);
+                            }
                         }
-                        temp->setData($3);
+                        else
+                        {
+                            temp->setData($3);
+                            temp->getData()->isHasValue = true;
+                            
+                        }
+
+                        if(temp->stackID == -1)
+                        {
+                            JavaCode << "\t\tputstatic int " << className << "." << *$1 << endl;
+                        }
+                        else
+                        {
+                            JavaCode << "\t\tistore " << (temp->stackID) << endl;
+                        }
+
 
                     }
                     |   ID '[' EXPRESSION ']' ASSIGN EXPRESSION
@@ -385,13 +552,36 @@ SIMPLE_STATEMENT    :   VARIABLES
                             yyerror("This ID is not Array Type",*$1);
                         temp->setArrayData($3->getInt(),$6);
                     }
-                    |   PRINT EXPRESSION
+                    |   PRINT 
                     {
-                        Trace("PRINT EXPRESSION");
+                        PrintCode();
                     }
-                    |   PRINTLN EXPRESSION
+                        EXPRESSION
+                    {
+                        
+                        Trace("PRINT EXPRESSION");
+                        if($3->getDataType() == BOOL_TYPE)
+                        {
+                            JavaCode << "\t\tinvokevirtual void java.io.PrintStream.print(boolean)" << endl;
+                        }else
+                        {
+                            JavaCode << "\t\tinvokevirtual void java.io.PrintStream.print(" << getIdDataTypeCode( $3->getDataType() ) << ")" << endl;
+                        }
+                    }
+                    |   PRINTLN 
+                    {
+                        PrintCode();
+                    }   EXPRESSION
                     {
                         Trace("PRINTLN EXPRESSION");
+                        if($3->getDataType() == BOOL_TYPE)
+                        {
+                            JavaCode << "\t\tinvokevirtual void java.io.PrintStream.println(boolean)" << endl;
+                        }else
+                        {
+                            JavaCode << "\t\tinvokevirtual void java.io.PrintStream.println(" << getIdDataTypeCode( $3->getDataType() ) << ")" << endl;
+                        }
+                        
                     }
                     |   READ ID
                     {
@@ -401,7 +591,16 @@ SIMPLE_STATEMENT    :   VARIABLES
                             yyerror("ID Error, Not exist in the scope",*$2);
                     }
                     |   RETURN
+                    {
+                        returnFlag = true;
+                        JavaCode << "\t\treturn" << endl;
+                    }
                     |   EXPRESSION
+                    |   RETURN EXPRESSION
+                    {
+                        returnFlag = true;
+                        JavaCode << "\t\tireturn" << endl;
+                    }
                     ;
 
 BLOCK   :   '{'
@@ -414,7 +613,7 @@ BLOCK   :   '{'
             $$ = new map<string,IDContent*>();
             *$$ = SYMBOLTABLES.getTopTable();
             Trace("BLOCK }");
-            SYMBOLTABLES.dumpTABLE();
+            //SYMBOLTABLES.dumpTABLE();
             if(! SYMBOLTABLES.popTABLE())
             {
                 cout << "DEBUG : vec is empty, can not pop" << endl;
@@ -424,46 +623,185 @@ BLOCK   :   '{'
 // // if ()
 // // eles
 CONDITION_STAMENT   :   IF_STAMENT
-                    |   IF_STAMENT ELSE_STAMENT
-IF_STAMENT  :   IF '(' EXPRESSION ')'
+
+IF_STAMENT  :/*   IF '(' EXPRESSION ')'
             {
+                if($3->getDataType() != BOOL_TYPE)
+                        yyerror("if ( must be boolean )");
+
                 Trace("IF ( EXPRESSION )");
                 SYMBOLTABLES.pushTABLE();
             } 
             SIMPLE_STATEMENT
             {
-                SYMBOLTABLES.dumpTABLE();
+                //SYMBOLTABLES.dumpTABLE();
                 SYMBOLTABLES.popTABLE();
             }
-            |   IF '(' EXPRESSION ')' BLOCK
+            |   
+            IF '(' EXPRESSION ')' BLOCK
+            {
+                if($3->getDataType() != BOOL_TYPE)
+                        yyerror("if ( must be boolean )");
+            }
+            |
+            */
+            IF '(' EXPRESSION ')' IF_SCOPE BLOCK_OR_SIMPLE
+            {
+                if($3->getDataType() != BOOL_TYPE)
+                        yyerror("if ( must be boolean )");
+
+                vector<int> temp = IfJumpPoints[IfJumpPoints.size()-1];
+                int temp2 = temp[temp.size()-1];
+                temp.pop_back();
+                IfJumpPoints[IfJumpPoints.size()-1] = temp;
+                JavaCode << "\tL" << temp2 <<  ":" << endl;
+
+
+            }
+            ELSE_STAMENT
+            |
+            IF '(' EXPRESSION ')' IF_SCOPE BLOCK_OR_SIMPLE {
+            if($3->getDataType() != BOOL_TYPE)
+                        yyerror("if ( must be boolean )");
+
+            if($6)
+            {
+                SYMBOLTABLES.popTABLE();
+            }
+            vector<int> temp = IfJumpPoints[IfJumpPoints.size()-1];
+
+
+
+            if (temp.size() == 2){
+                JavaCode << "\tL" << temp[temp.size()-1] << ":" << endl;
+                JavaCode << "\t\tgoto L" << temp[0] << endl;
+            }
+            int l = temp[0];
+            JavaCode << "\tL" << l <<  ":" << endl;
+            IfJumpPoints.pop_back();
+        }
+
+
+IF_SCOPE    :   
+            {
+                if(!IsElseIf)
+                {
+                    cout << "LabelNum : " << JumpCount << endl;
+                    vector<int> temp;
+                    IfJumpPoints.push_back(temp); 
+                    IfJumpPoints[IfJumpPoints.size()-1].push_back(JumpCount++);
+                    IfJumpPoints[IfJumpPoints.size()-1].push_back(JumpCount++);
+                    cout << "Debug Start ----------------\n";
+                    for(int i=0;i<IfJumpPoints.size();i++)
+                    {
+                        cout << "[" << i << "] : " << IfJumpPoints[i][IfJumpPoints[i].size()-1] << endl;
+                    }
+                    cout << "Debug End ----------------\n";
+                }
+                else
+                {
+                    IfJumpPoints[IfJumpPoints.size()-1].push_back(JumpCount++);
+                }
+                vector<int> temp = IfJumpPoints[IfJumpPoints.size()-1];
+                JavaCode << "\t\tifeq L" << temp[temp.size()-1] << endl;
+                IsElseIf = false;
+            }
+            
+PUSH_TABLE  :   
+            {
+                SYMBOLTABLES.pushTABLE();
+            }
+BLOCK_OR_SIMPLE :   
+                BLOCK
+                {
+                    $$ = false;
+                    JavaCode << "\t\tgoto L" << IfJumpPoints[IfJumpPoints.size()-1][0] << endl;
+                }
+                |
+                PUSH_TABLE SIMPLE_STATEMENT
+                {
+                    $$ = true;
+                    JavaCode << "\t\tgoto L" << IfJumpPoints[IfJumpPoints.size()-1][0] << endl;
+                }
+
+WHILE_BLOCK_OR_SIMPLE:
+                    BLOCK
+                    {
+                        $$ = false;
+                        JavaCode << "\t\tgoto Lbegin" << WhileJumpPoints[WhileJumpPoints.size()-1][0]  << endl;
+                    }
+                    |
+                    PUSH_TABLE SIMPLE_STATEMENT
+                    {
+                        $$ = true;
+                        JavaCode << "\t\tgoto Lbegin" << WhileJumpPoints[WhileJumpPoints.size()-1][0] << endl;
+                    }
+
 
 ELSE_STAMENT    :   ELSE
                 {
                     Trace("ELSE");
                     SYMBOLTABLES.pushTABLE();
-                }   
+                    IsElseIf = true;
+                }
+                /*
+                IF_STAMENT  //else if
+                |  
                 SIMPLE_STATEMENT
                 {
-                    SYMBOLTABLES.dumpTABLE();
+                    //SYMBOLTABLES.dumpTABLE();
                     SYMBOLTABLES.popTABLE();
+                }*/
+                |   ELSE BLOCK_OR_SIMPLE
+                {
+                    if($2)
+                    {
+                        SYMBOLTABLES.pushTABLE();
+                    }
+                    vector<int> temp = IfJumpPoints[IfJumpPoints.size()-1];
+                    JavaCode << "\tL" << temp[0] << ":" << endl; 
+                    IfJumpPoints.pop_back();
                 }
-                |   ELSE BLOCK
-                |   ELSE IF_STAMENT
-                |   ELSE IF_STAMENT ELSE_STAMENT
 
 
 //
 // // Loop Staments
 // // while()
 // // for()
-LOOP_STAMENT    :   WHILE '(' EXPRESSION ')'
+LOOP_STAMENT    :   WHILE 
                 {
-                    SYMBOLTABLES.pushTABLE();
-                }   
+                    vector<int> temp;
+                    for(int i=0;i<4;i++)
+                    {
+                        // L begin,true,false,exit
+                        temp.push_back(JumpCount++);
+                    }
+                    WhileJumpPoints.push_back(temp);
+                    
+                    JavaCode << "\t\tgoto Lbegin" << WhileJumpPoints[WhileJumpPoints.size()-1][0] << endl;
+                    JavaCode << "\tLbegin" << WhileJumpPoints[WhileJumpPoints.size()-1][0] << ":" << endl;
+                }
+                '(' EXPRESSION ')'
+                {
+                    //SYMBOLTABLES.pushTABLE();
+                    JavaCode << "\t\tifeq Lexit" << WhileJumpPoints[WhileJumpPoints.size()-1][3] << endl;
+                    JavaCode << "\t\tgoto Ltrue" << WhileJumpPoints[WhileJumpPoints.size()-1][3] << endl;
+                    JavaCode << "\tLtrue" << WhileJumpPoints[WhileJumpPoints.size()-1][3] << ":" << endl;
+                }
+                WHILE_BLOCK_OR_SIMPLE
+                {
+                    if($4->getDataType() != BOOL_TYPE)
+                        yyerror("While( must be boolean )");
+                    if($7)
+                        SYMBOLTABLES.popTABLE();
+                    JavaCode << "\tLexit" << WhileJumpPoints[WhileJumpPoints.size()-1][3] << ":" << endl;
+                    WhileJumpPoints.pop_back();
+                }
+                /*   
                 SIMPLE_STATEMENT
                 {
                     Trace("WHILE ( EXPRESSION )");
-                    SYMBOLTABLES.dumpTABLE();
+                    //SYMBOLTABLES.dumpTABLE();
                     SYMBOLTABLES.popTABLE();
                     if($3->getDataType() != BOOL_TYPE)
                         yyerror("While( must be boolean )");
@@ -474,14 +812,14 @@ LOOP_STAMENT    :   WHILE '(' EXPRESSION ')'
                     Trace("WHILE ( EXPRESSION ) { }");
                     if($3->getDataType() != BOOL_TYPE)
                         yyerror("While( must be Boolean )");
-                }
+                }*/
                 |   FOR '(' ID LESSTHEN '-' EXPRESSION TO EXPRESSION ')'
                 {
                     SYMBOLTABLES.pushTABLE();
                 }   SIMPLE_STATEMENT
                 {
                     Trace("FOR ( ID < - EXPRESSION TO EXPRESSION )");
-                    SYMBOLTABLES.dumpTABLE();
+                    //SYMBOLTABLES.dumpTABLE();
                     SYMBOLTABLES.popTABLE();
                     // only accep int
                     if($6->getDataType() == INT_TYPE && $8->getDataType() == INT_TYPE)
@@ -505,6 +843,8 @@ LOOP_STAMENT    :   WHILE '(' EXPRESSION ')'
                         yyerror("For( must be Int )");
                     }
                 }
+
+
 //
 // ===========================
 // =========== END ===========
@@ -547,6 +887,28 @@ FUNCTION_CALL   :   ID '(' COMMA_SEPARATED_EXPRESSION ')'
                         }
                     }
                     $$ = new DataValue(temp->getReturnType());
+
+                    if(temp->getReturnType() == NIL_TYPE)
+                    {
+                        JavaCode << "\t\tinvokestatic void " << className << "." << *$1 << "(" ;
+                    }
+                    else
+                    {
+                        JavaCode << "\t\tinvokestatic int " << className << "." << *$1 << "(" ;
+                    }
+
+                    //JavaCode << "\t\tinvokestatic int " << className << "." << *$1 << "(" ;
+                    for(int i=$3->size()-1;i>=0;--i){
+                        if(i == $3->size()-1)
+                        {
+                            JavaCode << getIdDataTypeCode((*$3)[i]->getDataType());
+                        }
+                        else
+                        {
+                            JavaCode << "," <<  getIdDataTypeCode((*$3)[i]->getDataType());
+                        }
+                    }
+                    JavaCode << ")" << endl;
                 }
 COMMA_SEPARATED_EXPRESSION  :   
                             {
@@ -597,6 +959,7 @@ EXPRESSION :
             default:
                 yyerror("Type error(- unary), only Int or Float");
         }
+        OpCode('n');
     }|
     EXPRESSION '+' EXPRESSION
     {
@@ -624,6 +987,7 @@ EXPRESSION :
             yyerror("Type error(not equal) while doing Operater + ");
         }
         $$ = result;
+        OpCode('+');
     }|
     EXPRESSION '-' EXPRESSION
     {
@@ -651,6 +1015,7 @@ EXPRESSION :
             yyerror("Type error(not equal) while doing Operater - ");
         }
         $$ = result;
+        OpCode('-');
     }|
     EXPRESSION '*' EXPRESSION
     {
@@ -678,19 +1043,26 @@ EXPRESSION :
             yyerror("Type error(not equal) while doing Operater * ");
         }
         $$ = result;
+        OpCode('*');
     }|
     EXPRESSION '/' EXPRESSION
     {
         // / 
+        
         Trace("EXPRESSION / EXPRESSION");
         DataValue * result = new DataValue();
+        
         if($1->getDataType() == $3->getDataType())
         {
+            
             switch($1->getDataType())
             {
                 case INT_TYPE: 
+                    
                     result->setType($1->getDataType());
-                    result->setInt($1->getInt() / $3->getInt());
+                    //int temp  = $1->getInt() ;
+                    cout << "Debug : " << result->getDataType() << endl;
+                    result->setInt(0);
                     break;
                 case FLOAT_TYPE:
                     result->setType($1->getDataType());
@@ -704,7 +1076,9 @@ EXPRESSION :
         {
             yyerror("Type error(not equal) while doing Operater / ");
         }
+        //cout << "Debug : " << result->getDataType() << endl;
         $$ = result;
+        OpCode('/');
     }|
     // Logical Operator
     EXPRESSION LG_AND EXPRESSION
@@ -722,6 +1096,7 @@ EXPRESSION :
             yyerror("Type error(not Boolean) while doing Logical Operation ");
         }
         $$ = result;
+        OpCode('&');
     }|
     EXPRESSION LG_OR EXPRESSION
     {
@@ -738,6 +1113,7 @@ EXPRESSION :
             yyerror("Type error(not Boolean) while doing Logical Operation ");
         }
         $$ = result;
+        OpCode('|');
     }|
     LG_NOT EXPRESSION
     {
@@ -754,6 +1130,7 @@ EXPRESSION :
             yyerror("Type error(not Boolean) while doing Logical Operation ");
         }
         $$ = $2;
+        OpCode('!');
     }|
     EXPRESSION LESSTHEN EXPRESSION
     {
@@ -780,6 +1157,7 @@ EXPRESSION :
             yyerror("Type error(only int, float) while doing '<' ");
         }
         $$ = result;
+        LogicOpCode(0);
     }|
     EXPRESSION LESSEQUAL EXPRESSION
     {
@@ -806,6 +1184,7 @@ EXPRESSION :
             yyerror("Type error(only int, float) while doing '<=' ");
         }
         $$ = result;
+        LogicOpCode(1);
     }|
     EXPRESSION MORETHEN EXPRESSION
     {
@@ -833,6 +1212,7 @@ EXPRESSION :
             yyerror("Type error(only int, float) while doing '>' ");
         }
         $$ = result;
+        LogicOpCode(3);
     }|
     EXPRESSION MOREEQUAL EXPRESSION
     {
@@ -860,6 +1240,7 @@ EXPRESSION :
             yyerror("Type error(only int, float) while doing '>=' ");
         }
         $$ = result;
+        LogicOpCode(4);
     }|
     EXPRESSION EQUAL EXPRESSION
     {
@@ -890,6 +1271,7 @@ EXPRESSION :
             yyerror("Type error(not equal) while doing '==' ");
         }
         $$ = result;
+        LogicOpCode(2);
     }|
     EXPRESSION NOTEQUAL EXPRESSION
     {
@@ -920,6 +1302,7 @@ EXPRESSION :
             yyerror("Type error(not equal) while doing '<' ");
         }
         $$ = result;
+        LogicOpCode(5);
     }|
     FUNCTION_CALL
     |
@@ -934,7 +1317,45 @@ EXPRESSION :
             yyerror("ID Type Error(is a array type)");
         // Find this ID and return as DataValue * type
         $$ = temp->getData();
-        
+        // Java
+        DataValue * data = temp->getData();
+        int value;
+        if(temp->getDeclareType() == CONST_TYPE)
+        {
+            //cout << "_______Here!!!!!!!!!!!!!!!!!!!!!!\n";
+            if(data->getDataType() == INT_TYPE)
+            {
+                PushCode(data->getInt());
+            }
+            else if(data->getDataType() == BOOL_TYPE)
+            {
+                if(data->getBool())
+                {
+                    PushCode(1);   //true
+                }
+                else
+                {
+                    PushCode(0);    //false
+                }
+            }
+            else //string
+            {
+                JavaCode << "\t\tldc " <<  "\"" << *(data->getStr()) << "\"" << endl;
+            }
+        }
+        else
+        {
+            //cout << "Here!!!!!!!!!!!!!!!!!!!!!!\n";
+            if(temp->stackID == -1)
+            {
+                JavaCode << "\t\tgetstatic int " << className << "." << *$1 << endl;
+            }
+            else
+            {
+                LoadCode(temp->stackID);
+            }
+        }
+
     }|
     ID '[' EXPRESSION ']' 
     {
@@ -995,11 +1416,21 @@ DATA_VALUE  :  INT_VALUE
             {
                 Trace("INT VALUE");
                 $$ = new DataValue($1);
+                PushCode($1);
             }
             |   BOOL_VALUE
             {
                 Trace("BOOL VALUE");
                 $$ = new DataValue($1);
+                if($1)
+                {
+                    PushCode(1);
+                }
+                else
+                {
+                    PushCode(0);
+                }
+                
             }
             |   CHAR_VALUE
             {
@@ -1010,6 +1441,7 @@ DATA_VALUE  :  INT_VALUE
             {
                 Trace("STRING VALUE");
                 $$ = new DataValue($1);
+                JavaCode << "\t\tldc "  << "\"" << *$1 << "\"" << endl;
             }
             |   FLOAT_VALUE
             {
@@ -1024,11 +1456,24 @@ DATA_VALUE  :  INT_VALUE
 int main(int argc,char ** argv)
 {
     ++argv, --argc; 
-
+    string filename;
 	if ( argc > 0 )
+    {
 	    yyin = fopen( argv[0], "r" );
+        filename = string(argv[0]);
+        filename = filename +  ".jasm";
+        JavaCode.open(filename,ios::out);
+    }
 	else
+    {
 	    yyin = stdin;
+        JavaCode.open("JaveByteCode.jasm",ios::out);
+    }
+
+    if(!JavaCode){
+        cout << "Can't build JavaByteCode file !\n";
+        exit(1);
+    }
 
 	if(!yyin){
 		printf("Load File Failed\n");
@@ -1036,13 +1481,21 @@ int main(int argc,char ** argv)
 	} 
 
     if (yyparse() == 1)                
-        yyerror("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Parsing error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! !");
+            yyerror("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!Parsing error!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! !");
     else
     {
         printf("\n");
         printf("~~~~~~~~~~~~~~~~~~~~~~~~~~~~Parsing Success~~~~~~~~~~~~~~~~~~~~~~~~~~~~ \n");
         printf("\n");
+        if(isHasMain)
+        {
+            SYMBOLTABLES.dumpTABLE();
+            cout << "JaveByteCode File : " << filename << "has been built\n";
+        }
+        else
+        {
+            cout << "No main() exist !\n";
+        }
     }  
     
-    //SYMBOLTABLES.dumpTABLE();
 }
